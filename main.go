@@ -139,10 +139,24 @@ func main() {
 	logContainer := container.NewScroll(logText)
 	logContainer.SetMinSize(fyne.NewSize(580, 200))
 
-	// 退出按钮
+	// 操作按钮
+	cupsButton := widget.NewButton("打开CUPS管理", func() {
+		go func() {
+			err := steps.OpenCUPSAdmin()
+			if err != nil {
+				addLog(logText, fmt.Sprintf("❌ 打开CUPS管理界面失败: %v", err))
+			} else {
+				addLog(logText, "🌐 已打开CUPS管理界面")
+			}
+		}()
+	})
+
 	exitButton := widget.NewButton("退出程序", func() {
 		myApp.Quit()
 	})
+
+	// 按钮容器
+	buttonContainer := container.NewHBox(cupsButton, exitButton)
 
 	// 布局
 	content := container.NewVBox(
@@ -152,7 +166,7 @@ func main() {
 		progressBar,
 		widget.NewLabel("详细日志:"),
 		logContainer,
-		exitButton,
+		buttonContainer,
 	)
 
 	window.SetContent(content)
