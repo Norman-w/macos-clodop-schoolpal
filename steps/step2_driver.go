@@ -8,16 +8,23 @@ import (
 	"path/filepath"
 
 	"macos-clodop-schoolpal/config"
+	"macos-clodop-schoolpal/utils"
 )
 
 // VerifyDriver 验证驱动文件
 func VerifyDriver(cfg *config.Config) error {
-	driverPath := cfg.Printer.DriverFile
+	// 使用新的路径查找逻辑
+	driverPath, err := utils.GetResourcePath(cfg.Printer.DriverFile)
+	if err != nil {
+		return fmt.Errorf("无法定位驱动文件: %v", err)
+	}
 
 	// 检查驱动文件是否存在
 	if _, err := os.Stat(driverPath); os.IsNotExist(err) {
 		return fmt.Errorf("驱动文件不存在: %s", driverPath)
 	}
+
+	fmt.Printf("📁 找到驱动文件: %s\n", driverPath)
 
 	// 检查文件扩展名
 	if filepath.Ext(driverPath) != ".pkg" {
@@ -33,6 +40,8 @@ func VerifyDriver(cfg *config.Config) error {
 	if fileInfo.Size() < 200*1024 { // 小于200KB可能有问题
 		return fmt.Errorf("驱动文件大小异常，可能文件损坏: %d bytes", fileInfo.Size())
 	}
+
+	fmt.Printf("✅ 驱动文件验证成功 (大小: %.2f MB)\n", float64(fileInfo.Size())/(1024*1024))
 
 	// 计算文件MD5校验和
 	file, err := os.Open(driverPath)

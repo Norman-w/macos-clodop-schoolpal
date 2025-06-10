@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"macos-clodop-schoolpal/config"
+	"macos-clodop-schoolpal/utils"
 )
 
 // InstallDriver 安装打印机驱动
@@ -18,7 +19,11 @@ func InstallDriver(cfg *config.Config) error {
 		return nil
 	}
 
-	driverPath := cfg.Printer.DriverFile
+	// 使用新的路径查找逻辑
+	driverPath, err := utils.GetResourcePath(cfg.Printer.DriverFile)
+	if err != nil {
+		return fmt.Errorf("无法定位驱动文件: %v", err)
+	}
 
 	// 确保驱动文件存在
 	if _, err := os.Stat(driverPath); os.IsNotExist(err) {
@@ -31,7 +36,7 @@ func InstallDriver(cfg *config.Config) error {
 		return fmt.Errorf("无法获取驱动文件绝对路径: %v", err)
 	}
 
-	fmt.Println("正在安装HPRT驱动...")
+	fmt.Printf("🔧 正在安装HPRT驱动: %s\n", filepath.Base(absPath))
 
 	// 使用AppleScript请求管理员权限并安装驱动
 	script := fmt.Sprintf(`do shell script "installer -pkg '%s' -target /" with administrator privileges`, absPath)
@@ -52,7 +57,7 @@ func InstallDriver(cfg *config.Config) error {
 		return err
 	}
 
-	fmt.Println("HPRT驱动安装完成")
+	fmt.Println("✅ HPRT驱动安装完成")
 	return nil
 }
 
