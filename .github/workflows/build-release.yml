@@ -41,18 +41,36 @@ jobs:
 
     - name: 验证架构
       run: |
+        echo "========== 构建环境信息 =========="
         echo "当前运行环境架构: $(uname -m)"
         echo "目标构建架构: ${{ matrix.arch }}"
+        echo "构建平台: ${{ matrix.arch_name }}"
+        echo "操作系统: $(sw_vers -productName) $(sw_vers -productVersion)"
         echo "Go 版本: $(go version)"
+        echo "工作目录: $(pwd)"
+        echo "磁盘空间: "
+        df -h
+        echo "=================================="
 
     - name: 安装和获取 socat
       run: |
+        echo "========== 安装和配置 socat =========="
+        echo "开始安装 socat..."
+        
+        # 更新 Homebrew（如果需要）
+        echo "更新 Homebrew..."
+        brew update
+        
         echo "安装 socat..."
         brew install socat
+        
+        echo "验证 socat 安装..."
+        socat -V | head -3
         
         echo "获取 socat 二进制文件位置..."
         SOCAT_PATH=$(which socat)
         echo "socat 位置: $SOCAT_PATH"
+        echo "socat 大小: $(ls -lh $SOCAT_PATH | awk '{print $5}')"
         
         # 创建构建目录
         mkdir -p build-assets
@@ -60,10 +78,14 @@ jobs:
         # 复制 socat 到构建资源目录
         cp "$SOCAT_PATH" build-assets/socat
         
-        # 验证 socat
-        ./build-assets/socat -V | head -5
+        # 验证复制的 socat
+        echo "验证复制的 socat:"
+        ls -la build-assets/socat
+        chmod +x build-assets/socat
+        ./build-assets/socat -V | head -3
         
         echo "✓ socat 准备完成"
+        echo "==============================="
 
     - name: 设置构建环境
       run: |
@@ -90,14 +112,20 @@ jobs:
 
     - name: 构建应用程序
       run: |
-        echo "开始构建 MacOS校宝打印组件 - ${{ matrix.arch_name }} 版本..."
+        echo "========== 开始构建应用程序 =========="
+        echo "构建平台: ${{ matrix.arch_name }} (${{ matrix.arch }})"
+        echo "构建时间: $(date)"
         
         # 设置应用程序名称
         APP_NAME="MacOS校宝打印组件"
         BUILD_DIR="build-${{ matrix.arch }}"
         
+        echo "应用程序名称: $APP_NAME"
+        echo "构建目录: $BUILD_DIR"
+        
         # 创建构建目录
         mkdir -p "$BUILD_DIR"
+        echo "✓ 构建目录创建完成"
         
         # 构建应用程序 (使用兼容性设置)
         echo "构建参数："
@@ -131,9 +159,25 @@ jobs:
         fi
         
         # 复制 socat
-        cp "build-assets/socat" "$BUILD_DIR/"
-        chmod +x "$BUILD_DIR/socat"
-        echo "✓ 复制 socat"
+        if [ -f "build-assets/socat" ]; then
+          cp "build-assets/socat" "$BUILD_DIR/"
+          chmod +x "$BUILD_DIR/socat"
+          echo "✓ 复制 socat (大小: $(ls -lh $BUILD_DIR/socat | awk '{print $5}'))"
+        else
+          echo "❌ socat 文件不存在!"
+          exit 1
+        fi
+        
+        # 验证所有文件
+        echo ""
+        echo "========== 构建内容验证 =========="
+        echo "构建目录内容:"
+        ls -la "$BUILD_DIR/"
+        echo ""
+        echo "文件大小汇总:"
+        du -h "$BUILD_DIR"/*
+        echo "总大小: $(du -sh "$BUILD_DIR" | cut -f1)"
+        echo "==============================="
         
         # 创建 README
         cat > "$BUILD_DIR/README.txt" << EOF
