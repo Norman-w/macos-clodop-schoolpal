@@ -1,0 +1,14 @@
+# VPN配置
+vpn:
+  name: "ShinetechDX"  # VPN名称（支持智能匹配）
+
+# 网络配置  
+network:
+  local_port: "8443"
+  remote_host: "192.168.1.252"  # 修改为Windows电脑的IP地址
+  remote_port: "8443"
+
+# 打印机配置
+printer:
+  model: "HPRT_TP80B"
+  driver_file: "hprt-pos-printer-driver-v1.2.16.pkg" 
