@@ -13,21 +13,23 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-13        # Intel Mac
+          - os: macos-12        # Intel Mac (更低版本以确保兼容性)
             arch: amd64
             arch_name: Intel
             runner_arch: x86_64
+            min_os_version: "10.13"  # 支持 High Sierra 及以上
           - os: macos-14        # ARM Mac (M1)
             arch: arm64
             arch_name: ARM
             runner_arch: arm64
+            min_os_version: "11.0"   # ARM Mac 最低 Big Sur
 
     steps:
     - name: 检出代码
       uses: actions/checkout@v4
 
     - name: 设置 Go 环境
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: '1.21'
 
@@ -57,13 +59,28 @@ jobs:
         
         echo "✓ socat 准备完成"
 
-    - name: 设置中文环境
+    - name: 设置构建环境
       run: |
         echo "设置中文语言环境..."
         export LC_ALL=zh_CN.UTF-8
         export LANG=zh_CN.UTF-8
         echo "LC_ALL=zh_CN.UTF-8" >> $GITHUB_ENV
         echo "LANG=zh_CN.UTF-8" >> $GITHUB_ENV
+        
+        echo "设置macOS兼容性..."
+        if [[ "${{ matrix.arch }}" == "amd64" ]]; then
+          # 设置Intel版本的最低系统要求为 macOS 10.13
+          echo "MACOSX_DEPLOYMENT_TARGET=10.13" >> $GITHUB_ENV
+          echo "CGO_CFLAGS=-mmacosx-version-min=10.13" >> $GITHUB_ENV
+          echo "CGO_LDFLAGS=-mmacosx-version-min=10.13" >> $GITHUB_ENV
+          echo "✓ Intel版本目标系统: macOS 10.13+"
+        else
+          # ARM版本最低为 macOS 11.0 (Big Sur)
+          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+          echo "CGO_CFLAGS=-mmacosx-version-min=11.0" >> $GITHUB_ENV  
+          echo "CGO_LDFLAGS=-mmacosx-version-min=11.0" >> $GITHUB_ENV
+          echo "✓ ARM版本目标系统: macOS 11.0+"
+        fi
 
     - name: 构建应用程序
       run: |
@@ -76,7 +93,12 @@ jobs:
         # 创建构建目录
         mkdir -p "$BUILD_DIR"
         
-        # 构建应用程序
+        # 构建应用程序 (使用兼容性设置)
+        echo "构建参数："
+        echo "  MACOSX_DEPLOYMENT_TARGET: $MACOSX_DEPLOYMENT_TARGET"
+        echo "  CGO_CFLAGS: $CGO_CFLAGS"
+        echo "  CGO_LDFLAGS: $CGO_LDFLAGS"
+        
         go build -ldflags="-s -w" -o "$BUILD_DIR/$APP_NAME" .
         
         if [ $? -eq 0 ]; then
@@ -111,20 +133,21 @@ jobs:
         MacOS校宝打印组件 - ${{ matrix.arch_name }} 版本 (${{ matrix.arch }})
         ================================================
         
-        构建信息：
-        - 构建时间: $(date '+%Y-%m-%d %H:%M:%S UTC')
-        - 构建环境: GitHub Actions ${{ matrix.os }}
-        - 目标架构: ${{ matrix.arch }}
-        - Go 版本: $(go version | cut -d' ' -f3)
+                 构建信息：
+         - 构建时间: $(date '+%Y-%m-%d %H:%M:%S UTC')
+         - 构建环境: GitHub Actions ${{ matrix.os }}
+         - 目标架构: ${{ matrix.arch }}
+         - 最低系统: macOS ${{ matrix.min_os_version }}
+         - Go 版本: $(go version | cut -d' ' -f3)
         
         安装说明：
         1. 运行 "$APP_NAME" 启动配置工具
         2. 按照步骤完成 HPRT 打印机配置
         3. 如需手动安装驱动，双击 "hprt-pos-printer-driver-v1.2.16.pkg"
         
-        系统要求：
-        ${{ matrix.arch_name == 'ARM' && '- macOS 11.0 或更高版本' || '- macOS 10.15 或更高版本' }}
-        ${{ matrix.arch_name == 'ARM' && '- Apple Silicon 处理器Mac (M1/M2/M3)' || '- Intel 处理器Mac' }}
+                 系统要求：
+         ${{ matrix.arch_name == 'ARM' && '- macOS 11.0 或更高版本' || '- macOS 10.13 或更高版本 (支持黑苹果)' }}
+         ${{ matrix.arch_name == 'ARM' && '- Apple Silicon 处理器Mac (M1/M2/M3)' || '- Intel 处理器Mac (包括黑苹果)' }}
         
         包含组件：
         - $APP_NAME: 主配置工具
@@ -158,7 +181,7 @@ jobs:
         echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
 
     - name: 上传构建产物
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: macos-clodop-schoolpal-${{ matrix.arch_name }}
         path: |
@@ -167,7 +190,7 @@ jobs:
 
     - name: 发布到 Release (仅标签触发)
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: ${{ env.ZIP_NAME }}
         name: MacOS校宝打印组件 ${{ github.ref_name }}
@@ -183,9 +206,9 @@ jobs:
           - ✅ 包含中文字体支持
           - ✅ 智能步骤检测，跳过已完成的配置
           
-          **下载说明**:
-          - Intel Mac 用户请下载 `MacOS校宝打印组件-Intel-*.zip`
-          - Apple Silicon Mac 用户请下载 `MacOS校宝打印组件-ARM-*.zip`
+                     **下载说明**:
+           - Intel Mac 用户请下载 `MacOS校宝打印组件-Intel-*.zip` (支持 macOS 10.13+，包括黑苹果)
+           - Apple Silicon Mac 用户请下载 `MacOS校宝打印组件-ARM-*.zip` (需要 macOS 11.0+)
           
           **安装步骤**:
           1. 下载对应架构的压缩包
