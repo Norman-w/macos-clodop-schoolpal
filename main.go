@@ -16,6 +16,7 @@ import (
 
 	"macos-clodop-schoolpal/config"
 	"macos-clodop-schoolpal/steps"
+	"macos-clodop-schoolpal/utils"
 )
 
 // initChineseFont 初始化中文字体支持
@@ -46,9 +47,14 @@ func preFlightCheck() error {
 		}
 	}
 
-	// 检查必要文件
-	if _, err := os.Stat("config.yaml"); os.IsNotExist(err) {
-		return fmt.Errorf("配置文件不存在: config.yaml")
+	// 检查必要文件 - 使用新的路径查找逻辑
+	configPath, err := utils.GetResourcePath("config.yaml")
+	if err != nil {
+		return fmt.Errorf("无法定位配置文件: %v", err)
+	}
+
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return fmt.Errorf("配置文件不存在: %s", configPath)
 	}
 
 	// 给当前程序设置执行权限（如果需要的话）
@@ -91,8 +97,11 @@ func main() {
 		log.Fatalf("前置检查失败: %v", err)
 	}
 
-	// 确定配置文件路径
-	configPath := "config.yaml"
+	// 确定配置文件路径 - 使用新的路径查找逻辑
+	configPath, err := utils.GetResourcePath("config.yaml")
+	if err != nil {
+		log.Fatalf("无法定位配置文件: %v", err)
+	}
 
 	// 读取配置文件
 	cfg, err := config.LoadConfig(configPath)

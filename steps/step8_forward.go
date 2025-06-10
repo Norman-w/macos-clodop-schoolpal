@@ -15,15 +15,18 @@ func StartPortForward(cfg *config.Config) error {
 	remoteHost := cfg.Network.RemoteHost
 	remotePort := cfg.Network.RemotePort
 
-	// 检查socat是否可用
-	cmd := exec.Command("which", "socat")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("socat未安装或不可用")
+	// 获取socat路径（优先使用预装版本）
+	socatPath, err := GetSocatPath()
+	if err != nil {
+		return fmt.Errorf("socat不可用: %v", err)
 	}
+
+	fmt.Printf("📡 使用socat: %s\n", socatPath)
 
 	// 检查端口是否已经被占用
 	if isPortInUse(localPort) {
 		// 如果端口被占用，尝试停止现有的端口转发
+		fmt.Printf("⚠️ 端口 %s 已被占用，尝试停止现有服务...\n", localPort)
 		stopExistingPortForward(localPort)
 	}
 
@@ -31,11 +34,13 @@ func StartPortForward(cfg *config.Config) error {
 	forwardCmd := fmt.Sprintf("TCP-LISTEN:%s,fork", localPort)
 	targetCmd := fmt.Sprintf("TCP:%s:%s", remoteHost, remotePort)
 
+	fmt.Printf("🔗 启动端口转发: %s -> %s:%s\n", localPort, remoteHost, remotePort)
+
 	ctx := context.Background()
-	cmd = exec.CommandContext(ctx, "socat", forwardCmd, targetCmd)
+	cmd := exec.CommandContext(ctx, socatPath, forwardCmd, targetCmd)
 
 	// 在后台启动端口转发
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		return fmt.Errorf("启动端口转发失败: %v", err)
 	}
@@ -48,6 +53,7 @@ func StartPortForward(cfg *config.Config) error {
 		return fmt.Errorf("端口转发启动后端口仍不可用")
 	}
 
+	fmt.Printf("✅ 端口转发已启动，监听端口 %s\n", localPort)
 	return nil
 }
 
