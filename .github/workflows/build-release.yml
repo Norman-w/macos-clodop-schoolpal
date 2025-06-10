@@ -5,15 +5,6 @@ on:
     tags:
       - 'v*'  # 当推送版本标签时触发
   workflow_dispatch:  # 允许手动触发
-    inputs:
-      build_mode:
-        description: '构建模式'
-        required: true
-        default: 'sequential'
-        type: choice
-        options:
-        - sequential  # 顺序执行（推荐）
-        - parallel    # 并行执行
 
 # 设置权限
 permissions:
@@ -27,10 +18,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 第一阶段：Intel构建
+    # 第一阶段：Intel构建
   build-intel:
-    name: 🔨 构建 Intel 版本
-    runs-on: macos-12
+    name: 🔨 构建 Intel 版本  
+    runs-on: macos-13
     timeout-minutes: 30
     
     steps:
@@ -39,9 +30,11 @@ jobs:
         echo "========== Intel构建开始 =========="
         echo "⏰ 开始时间: $(date '+%Y-%m-%d %H:%M:%S UTC')"
         echo "🏗️ Runner环境: $(uname -m)"
+        echo "🖥️ 系统版本: $(sw_vers -productVersion)"
         echo "🎯 目标架构: Intel (amd64)"
         echo "📊 可用内存: $(vm_stat | grep 'Pages free' | awk '{print $3}' | sed 's/\.//')页"
         echo "💽 可用磁盘: $(df -h / | tail -1 | awk '{print $4}')"
+        echo "🛠️ Homebrew状态: $(brew --version | head -1)"
         echo "=================================="
     
     - name: 检出代码
@@ -112,8 +105,6 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 30
     needs: build-intel  # 等待Intel构建完成
-    # 如果手动选择并行模式，则不依赖Intel
-    if: ${{ github.event.inputs.build_mode != 'parallel' || github.event.inputs.build_mode == '' }}
     
     steps:
     - name: 🚀 开始ARM构建
@@ -187,37 +178,6 @@ jobs:
         name: macos-clodop-schoolpal-ARM
         path: ${{ env.ZIP_NAME }}
 
-  # 并行构建选项（如果用户选择）
-  build-parallel:
-    name: 🔨 并行构建 ${{ matrix.arch_name }} 版本
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    if: ${{ github.event.inputs.build_mode == 'parallel' }}
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        include:
-          - os: macos-12
-            arch: amd64
-            arch_name: Intel
-          - os: macos-14
-            arch: arm64
-            arch_name: ARM
-    
-    steps:
-    - name: 🚀 开始并行构建
-      run: |
-        echo "========== ${{ matrix.arch_name }}并行构建开始 =========="
-        echo "⏰ 开始时间: $(date '+%Y-%m-%d %H:%M:%S UTC')"
-        echo "🏗️ Runner环境: $(uname -m)"
-        echo "🎯 目标架构: ${{ matrix.arch_name }}"
-        echo "=================================="
-    
-    # 这里可以复用之前的构建步骤...
-    - name: 检出代码
-      uses: actions/checkout@v4
-    # ... 其他步骤
 
   # 发布汇总
   release:
