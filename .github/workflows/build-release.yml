@@ -87,13 +87,6 @@ jobs:
         cp build-assets/socat "$BUILD_DIR/"
         chmod +x "$BUILD_DIR/socat"
         
-        echo "📦 创建README..."
-        cat > "$BUILD_DIR/README.txt" << EOF
-MacOS校宝打印组件 - Intel版本
-构建时间: $(date '+%Y-%m-%d %H:%M:%S UTC')
-支持系统: macOS 10.13+ (包括黑苹果)
-EOF
-        
         echo "✅ Intel版本构建完成"
         ls -la "$BUILD_DIR/"
 
@@ -174,13 +167,6 @@ EOF
         cp hprt-pos-printer-driver-v1.2.16.pkg "$BUILD_DIR/" 2>/dev/null || echo "⚠️ 驱动文件不存在"
         cp build-assets/socat "$BUILD_DIR/"
         chmod +x "$BUILD_DIR/socat"
-        
-        echo "📦 创建README..."
-        cat > "$BUILD_DIR/README.txt" << EOF
-MacOS校宝打印组件 - ARM版本
-构建时间: $(date '+%Y-%m-%d %H:%M:%S UTC')
-支持系统: macOS 11.0+ (Apple Silicon)
-EOF
         
         echo "✅ ARM版本构建完成"
         ls -la "$BUILD_DIR/"
