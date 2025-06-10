@@ -6,6 +6,12 @@ on:
       - 'v*'  # 当推送版本标签时触发
   workflow_dispatch:  # 允许手动触发
 
+# 设置权限
+permissions:
+  contents: write  # 需要写权限来创建release
+  actions: read
+  checks: read
+
 jobs:
   build:
     name: 构建 ${{ matrix.arch }} 版本
@@ -101,10 +107,11 @@ jobs:
         
         go build -ldflags="-s -w" -o "$BUILD_DIR/$APP_NAME" .
         
-        if [ $? -eq 0 ]; then
+        BUILD_EXIT_CODE=$?
+        if [ $BUILD_EXIT_CODE -eq 0 ]; then
           echo "✓ ${{ matrix.arch_name }} 版本构建成功"
         else
-          echo "✗ ${{ matrix.arch_name }} 版本构建失败"
+          echo "✗ ${{ matrix.arch_name }} 版本构建失败 (退出码: $BUILD_EXIT_CODE)"
           exit 1
         fi
         
@@ -170,15 +177,25 @@ jobs:
         echo "创建压缩包: $ZIP_NAME"
         cd "$BUILD_DIR"
         zip -r "../$ZIP_NAME" . -x "*.DS_Store"
+        ZIP_EXIT_CODE=$?
         cd ..
         
-        # 显示文件信息
-        echo "压缩包信息:"
-        ls -lh "$ZIP_NAME"
+        if [ $ZIP_EXIT_CODE -eq 0 ]; then
+          echo "✓ 压缩包创建成功"
+          # 显示文件信息
+          echo "压缩包信息:"
+          ls -lh "$ZIP_NAME"
+        else
+          echo "✗ 压缩包创建失败 (退出码: $ZIP_EXIT_CODE)"
+          exit 1
+        fi
         
         # 设置环境变量供后续步骤使用
         echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
         echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
+        
+        # 输出构建状态供summary使用
+        echo "BUILD_STATUS=success" >> $GITHUB_OUTPUT
 
     - name: 上传构建产物
       uses: actions/upload-artifact@v4
@@ -190,7 +207,7 @@ jobs:
 
     - name: 发布到 Release (仅标签触发)
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v1
       with:
         files: ${{ env.ZIP_NAME }}
         name: MacOS校宝打印组件 ${{ github.ref_name }}
@@ -231,14 +248,35 @@ jobs:
     steps:
     - name: 显示构建结果
       run: |
-        echo "## 🎉 MacOS校宝打印组件构建完成"
+        echo "## MacOS校宝打印组件构建摘要"
         echo ""
         echo "### 构建状态"
-        echo "- Intel 版本: ${{ needs.build.outputs.intel-status || '完成' }}"
-        echo "- ARM 版本: ${{ needs.build.outputs.arm-status || '完成' }}"
-        echo ""
-        echo "### 产物下载"
-        echo "构建产物已上传到 GitHub Actions Artifacts"
-        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-          echo "Release 已自动创建: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+        
+        # 检查构建结果
+        INTEL_RESULT=""
+        ARM_RESULT=""
+        OVERALL_SUCCESS=true
+        
+        # 遍历构建结果
+        for result in ${{ join(needs.build.result, ' ') }}; do
+          if [ "$result" != "success" ]; then
+            OVERALL_SUCCESS=false
+          fi
+        done
+        
+        # 检查每个job的状态
+        if [ "${{ needs.build.result }}" == "success" ]; then
+          echo "✅ 所有版本构建成功"
+          echo ""
+          echo "### 📦 产物下载"
+          echo "构建产物已上传到 GitHub Actions Artifacts"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "🚀 Release 已自动创建: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          fi
+        else
+          echo "❌ 构建失败"
+          echo "构建状态: ${{ needs.build.result }}"
+          echo ""
+          echo "请检查构建日志以获取详细错误信息。"
+          exit 1
         fi 
