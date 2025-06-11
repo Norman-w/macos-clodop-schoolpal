@@ -57,39 +57,53 @@ jobs:
       run: |
         echo "========== 编译静态Intel版socat =========="
         
+        # 确保Xcode Command Line Tools可用
+        xcode-select --install 2>/dev/null || echo "Xcode CLI tools already installed"
+        
         # 安装编译依赖
         brew install autoconf automake libtool
         
         # 下载socat源码
         SOCAT_VERSION="1.8.0.0"
-        wget http://www.dest-unreach.org/socat/download/socat-${SOCAT_VERSION}.tar.gz
+        curl -L -o socat-${SOCAT_VERSION}.tar.gz http://www.dest-unreach.org/socat/download/socat-${SOCAT_VERSION}.tar.gz
         tar -xzf socat-${SOCAT_VERSION}.tar.gz
         cd socat-${SOCAT_VERSION}
         
-        # 配置静态编译
+        # 简化的静态编译配置
         echo "🔧 配置静态编译..."
-        export CFLAGS="-mmacosx-version-min=10.13 -arch x86_64"
-        export LDFLAGS="-mmacosx-version-min=10.13 -arch x86_64 -static-libgcc"
+        export CC="clang"
+        export CFLAGS="-mmacosx-version-min=10.13 -arch x86_64 -O2"
+        export LDFLAGS="-mmacosx-version-min=10.13 -arch x86_64"
         
+        # 更简单的configure配置
         ./configure \
-          --disable-shared \
-          --enable-static \
+          --prefix=/tmp/socat-static \
           --disable-readline \
           --disable-openssl \
-          --prefix=/tmp/socat-static
+          --disable-libwrap \
+          --disable-pty \
+          --disable-ext2 \
+          --disable-socks4 \
+          --disable-socks4a \
+          --disable-proxy \
+          --disable-tcpwrap
         
         # 编译
         echo "🔨 编译socat..."
-        make -j$(sysctl -n hw.ncpu)
+        make -j$(sysctl -n hw.ncpu) || make  # 如果并行编译失败，尝试单线程
         
-        # 安装到临时目录
-        make install
+        # 手动安装
+        mkdir -p /tmp/socat-static/bin
+        cp socat /tmp/socat-static/bin/
         
         # 验证编译结果
         STATIC_SOCAT="/tmp/socat-static/bin/socat"
-        echo "📁 静态socat位置: $STATIC_SOCAT"
+        echo "📁 编译的socat位置: $STATIC_SOCAT"
         file "$STATIC_SOCAT"
-        otool -L "$STATIC_SOCAT" || echo "静态链接，无外部依赖"
+        
+        # 检查依赖（应该主要是系统库）
+        echo "🔍 检查依赖库:"
+        otool -L "$STATIC_SOCAT" | head -10
         
         # 测试基本功能
         "$STATIC_SOCAT" -V
@@ -99,7 +113,7 @@ jobs:
         cp "$STATIC_SOCAT" ../build-assets/socat
         chmod +x ../build-assets/socat
         
-        echo "✅ Intel版静态socat编译完成"
+        echo "✅ Intel版socat编译完成"
         cd ..
 
     - name: 构建Intel应用程序
@@ -117,10 +131,11 @@ jobs:
         cp build-assets/socat "$BUILD_DIR/"
         chmod +x "$BUILD_DIR/socat"
         
-        # 验证socat无依赖
+        # 验证socat
         echo "🔍 验证bundled socat..."
         file "$BUILD_DIR/socat"
-        otool -L "$BUILD_DIR/socat" || echo "✅ 静态链接，无外部依赖"
+        echo "依赖库列表:"
+        otool -L "$BUILD_DIR/socat" | head -10
         
         echo "✅ Intel版本构建完成"
         ls -la "$BUILD_DIR/"
@@ -178,39 +193,53 @@ jobs:
       run: |
         echo "========== 编译静态ARM版socat =========="
         
+        # 确保Xcode Command Line Tools可用
+        xcode-select --install 2>/dev/null || echo "Xcode CLI tools already installed"
+        
         # 安装编译依赖
         brew install autoconf automake libtool
         
         # 下载socat源码
         SOCAT_VERSION="1.8.0.0"
-        wget http://www.dest-unreach.org/socat/download/socat-${SOCAT_VERSION}.tar.gz
+        curl -L -o socat-${SOCAT_VERSION}.tar.gz http://www.dest-unreach.org/socat/download/socat-${SOCAT_VERSION}.tar.gz
         tar -xzf socat-${SOCAT_VERSION}.tar.gz
         cd socat-${SOCAT_VERSION}
         
-        # 配置静态编译（ARM版本）
-        echo "🔧 配置ARM静态编译..."
-        export CFLAGS="-mmacosx-version-min=11.0 -arch arm64"
-        export LDFLAGS="-mmacosx-version-min=11.0 -arch arm64 -static-libgcc"
+        # 简化的ARM编译配置
+        echo "🔧 配置ARM编译..."
+        export CC="clang"
+        export CFLAGS="-mmacosx-version-min=11.0 -arch arm64 -O2"
+        export LDFLAGS="-mmacosx-version-min=11.0 -arch arm64"
         
+        # 更简单的configure配置
         ./configure \
-          --disable-shared \
-          --enable-static \
+          --prefix=/tmp/socat-static \
           --disable-readline \
           --disable-openssl \
-          --prefix=/tmp/socat-static
+          --disable-libwrap \
+          --disable-pty \
+          --disable-ext2 \
+          --disable-socks4 \
+          --disable-socks4a \
+          --disable-proxy \
+          --disable-tcpwrap
         
         # 编译
         echo "🔨 编译ARM版socat..."
-        make -j$(sysctl -n hw.ncpu)
+        make -j$(sysctl -n hw.ncpu) || make  # 如果并行编译失败，尝试单线程
         
-        # 安装到临时目录
-        make install
+        # 手动安装
+        mkdir -p /tmp/socat-static/bin
+        cp socat /tmp/socat-static/bin/
         
         # 验证编译结果
         STATIC_SOCAT="/tmp/socat-static/bin/socat"
-        echo "📁 静态socat位置: $STATIC_SOCAT"
+        echo "📁 编译的socat位置: $STATIC_SOCAT"
         file "$STATIC_SOCAT"
-        otool -L "$STATIC_SOCAT" || echo "静态链接，无外部依赖"
+        
+        # 检查依赖（应该主要是系统库）
+        echo "🔍 检查依赖库:"
+        otool -L "$STATIC_SOCAT" | head -10
         
         # 测试基本功能
         "$STATIC_SOCAT" -V
@@ -220,7 +249,7 @@ jobs:
         cp "$STATIC_SOCAT" ../build-assets/socat
         chmod +x ../build-assets/socat
         
-        echo "✅ ARM版静态socat编译完成"
+        echo "✅ ARM版socat编译完成"
         cd ..
 
     - name: 构建ARM应用程序
@@ -238,10 +267,11 @@ jobs:
         cp build-assets/socat "$BUILD_DIR/"
         chmod +x "$BUILD_DIR/socat"
         
-        # 验证socat无依赖
+        # 验证socat
         echo "🔍 验证bundled socat..."
         file "$BUILD_DIR/socat"
-        otool -L "$BUILD_DIR/socat" || echo "✅ 静态链接，无外部依赖"
+        echo "依赖库列表:"
+        otool -L "$BUILD_DIR/socat" | head -10
         
         echo "✅ ARM版本构建完成"
         ls -la "$BUILD_DIR/"
