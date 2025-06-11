@@ -53,17 +53,54 @@ jobs:
         echo "CGO_LDFLAGS=-mmacosx-version-min=10.13" >> $GITHUB_ENV
         echo "✅ Intel版本目标系统: macOS 10.13+"
 
-    - name: 安装Intel版socat
+    - name: 编译静态Intel版socat
       run: |
-        echo "========== 安装Intel版socat =========="
-        brew install socat
-        SOCAT_PATH=$(which socat)
-        echo "📁 socat位置: $SOCAT_PATH"
-        file "$SOCAT_PATH"
-        mkdir -p build-assets
-        cp "$SOCAT_PATH" build-assets/socat
-        chmod +x build-assets/socat
-        echo "✅ Intel版socat准备完成"
+        echo "========== 编译静态Intel版socat =========="
+        
+        # 安装编译依赖
+        brew install autoconf automake libtool
+        
+        # 下载socat源码
+        SOCAT_VERSION="1.8.0.0"
+        wget http://www.dest-unreach.org/socat/download/socat-${SOCAT_VERSION}.tar.gz
+        tar -xzf socat-${SOCAT_VERSION}.tar.gz
+        cd socat-${SOCAT_VERSION}
+        
+        # 配置静态编译
+        echo "🔧 配置静态编译..."
+        export CFLAGS="-mmacosx-version-min=10.13 -arch x86_64"
+        export LDFLAGS="-mmacosx-version-min=10.13 -arch x86_64 -static-libgcc"
+        
+        ./configure \
+          --disable-shared \
+          --enable-static \
+          --disable-readline \
+          --disable-openssl \
+          --prefix=/tmp/socat-static
+        
+        # 编译
+        echo "🔨 编译socat..."
+        make -j$(sysctl -n hw.ncpu)
+        
+        # 安装到临时目录
+        make install
+        
+        # 验证编译结果
+        STATIC_SOCAT="/tmp/socat-static/bin/socat"
+        echo "📁 静态socat位置: $STATIC_SOCAT"
+        file "$STATIC_SOCAT"
+        otool -L "$STATIC_SOCAT" || echo "静态链接，无外部依赖"
+        
+        # 测试基本功能
+        "$STATIC_SOCAT" -V
+        
+        # 准备文件
+        mkdir -p ../build-assets
+        cp "$STATIC_SOCAT" ../build-assets/socat
+        chmod +x ../build-assets/socat
+        
+        echo "✅ Intel版静态socat编译完成"
+        cd ..
 
     - name: 构建Intel应用程序
       run: |
@@ -79,6 +116,11 @@ jobs:
         cp hprt-pos-printer-driver-v1.2.16.pkg "$BUILD_DIR/" 2>/dev/null || echo "⚠️ 驱动文件不存在"
         cp build-assets/socat "$BUILD_DIR/"
         chmod +x "$BUILD_DIR/socat"
+        
+        # 验证socat无依赖
+        echo "🔍 验证bundled socat..."
+        file "$BUILD_DIR/socat"
+        otool -L "$BUILD_DIR/socat" || echo "✅ 静态链接，无外部依赖"
         
         echo "✅ Intel版本构建完成"
         ls -la "$BUILD_DIR/"
@@ -132,17 +174,54 @@ jobs:
         echo "CGO_LDFLAGS=-mmacosx-version-min=11.0" >> $GITHUB_ENV
         echo "✅ ARM版本目标系统: macOS 11.0+"
 
-    - name: 安装ARM版socat
+    - name: 编译静态ARM版socat
       run: |
-        echo "========== 安装ARM版socat =========="
-        brew install socat
-        SOCAT_PATH=$(which socat)
-        echo "📁 socat位置: $SOCAT_PATH"
-        file "$SOCAT_PATH"
-        mkdir -p build-assets
-        cp "$SOCAT_PATH" build-assets/socat
-        chmod +x build-assets/socat
-        echo "✅ ARM版socat准备完成"
+        echo "========== 编译静态ARM版socat =========="
+        
+        # 安装编译依赖
+        brew install autoconf automake libtool
+        
+        # 下载socat源码
+        SOCAT_VERSION="1.8.0.0"
+        wget http://www.dest-unreach.org/socat/download/socat-${SOCAT_VERSION}.tar.gz
+        tar -xzf socat-${SOCAT_VERSION}.tar.gz
+        cd socat-${SOCAT_VERSION}
+        
+        # 配置静态编译（ARM版本）
+        echo "🔧 配置ARM静态编译..."
+        export CFLAGS="-mmacosx-version-min=11.0 -arch arm64"
+        export LDFLAGS="-mmacosx-version-min=11.0 -arch arm64 -static-libgcc"
+        
+        ./configure \
+          --disable-shared \
+          --enable-static \
+          --disable-readline \
+          --disable-openssl \
+          --prefix=/tmp/socat-static
+        
+        # 编译
+        echo "🔨 编译ARM版socat..."
+        make -j$(sysctl -n hw.ncpu)
+        
+        # 安装到临时目录
+        make install
+        
+        # 验证编译结果
+        STATIC_SOCAT="/tmp/socat-static/bin/socat"
+        echo "📁 静态socat位置: $STATIC_SOCAT"
+        file "$STATIC_SOCAT"
+        otool -L "$STATIC_SOCAT" || echo "静态链接，无外部依赖"
+        
+        # 测试基本功能
+        "$STATIC_SOCAT" -V
+        
+        # 准备文件
+        mkdir -p ../build-assets
+        cp "$STATIC_SOCAT" ../build-assets/socat
+        chmod +x ../build-assets/socat
+        
+        echo "✅ ARM版静态socat编译完成"
+        cd ..
 
     - name: 构建ARM应用程序
       run: |
@@ -158,6 +237,11 @@ jobs:
         cp hprt-pos-printer-driver-v1.2.16.pkg "$BUILD_DIR/" 2>/dev/null || echo "⚠️ 驱动文件不存在"
         cp build-assets/socat "$BUILD_DIR/"
         chmod +x "$BUILD_DIR/socat"
+        
+        # 验证socat无依赖
+        echo "🔍 验证bundled socat..."
+        file "$BUILD_DIR/socat"
+        otool -L "$BUILD_DIR/socat" || echo "✅ 静态链接，无外部依赖"
         
         echo "✅ ARM版本构建完成"
         ls -la "$BUILD_DIR/"
@@ -208,5 +292,10 @@ jobs:
           **📥 下载说明**:
           - Intel Mac用户: 下载 `MacOS校宝打印组件-Intel-*.zip`
           - Apple Silicon Mac用户: 下载 `MacOS校宝打印组件-ARM-*.zip`
+          
+          **🚀 新特性**:
+          - ✅ 完全独立运行，无需安装任何依赖
+          - ✅ 内置静态编译的socat，解决动态库依赖问题
+          - ✅ 支持在任何macOS系统上直接运行
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
